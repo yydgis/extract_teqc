@@ -66,7 +66,7 @@ static void extract_coordinate(const char* fname)
         {
             numepoch = atof(buffer + 25);
         }
-        if (strstr(buffer, "SUM 22") && strlen(buffer) >= 80)
+        if (strstr(buffer, "SUM") && buffer[0] == 'S' && buffer[1] == 'U' && buffer[2] == 'M' && strlen(buffer) >= 80)
         {
             oslps = atof(buffer + 74);
         }
