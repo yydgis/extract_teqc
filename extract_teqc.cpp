@@ -27,9 +27,24 @@ static void extract_coordinate(const char* fname)
     int numobs = 0;
     int numepoch = 0;
     int expepoch = 0;
+    char oslip_str[50] = { 0 };
+    char name[255] = { 0 };
+    char datestr[255] = { 0 };
+    strcpy(buffer, fname);
+    char* temp = strrchr(buffer, '-');
+    if (temp) strcpy(name, temp + 1);
+    temp = strrchr(name, '.');
+    if (temp) temp[0] = '\0';
+    strcpy(datestr, fname);
+    temp = strrchr(datestr, '-');
+    if (temp) temp[0] = '\0';
     while (fLOG && !feof(fLOG))
     {
         fgets(buffer, sizeof(buffer), fLOG);
+        temp = strrchr(buffer, '\n');
+        if (temp) temp[0] = '\0';
+        temp = strrchr(buffer, '\r');
+        if (temp) temp[0] = '\0';
         if (strstr(buffer, "Moving average MP12") && strlen(buffer) >= 34)
         {
             mp12 = atof(buffer + 25);
@@ -69,21 +84,22 @@ static void extract_coordinate(const char* fname)
         if (strstr(buffer, "SUM") && buffer[0] == 'S' && buffer[1] == 'U' && buffer[2] == 'M' && strlen(buffer) >= 80)
         {
             oslps = atof(buffer + 74);
+            strcpy(oslip_str, buffer + 62);
         }
         if (strstr(buffer, "IOD slips") && strlen(buffer) >= 32)
         {
-            iod_slip = atof(buffer + 25);
+            iod_slip += atof(buffer + 25);
         }
         if (strstr(buffer, "IOD or MP slips") && strlen(buffer) >= 32)
         {
-            mp_slip = atof(buffer + 25);
+            mp_slip += atof(buffer + 25);
         }
     }
     if (numepoch>0)
     {
-        printf("%6i,%6i,%6i,%6i,%6i,%6i,%10.6f,%10.6f,%10.6f,%10.6f,%10.6f,%10.6f,%s\n", expepoch, numepoch, numobs, iod_slip, mp_slip, oslps, mp12, mp21, mp15, mp51, mp17, mp71, fname);
+        printf("%s,%s,%6i,%6i,%6i,%6i,%6i,%6i,%10.6f,%10.6f,%10.6f,%10.6f,%10.6f,%10.6f,%s,%s\n", name, datestr, expepoch, numepoch, numobs, iod_slip, mp_slip, oslps, mp12, mp21, mp15, mp51, mp17, mp71, fname, oslip_str);
         FILE* fOUT = fopen("teqc_result.csv", "a");
-        if (fOUT) fprintf(fOUT,"%6i,%6i,%6i,%6i,%6i,%6i,%10.6f,%10.6f,%10.6f,%10.6f,%10.6f,%10.6f,%s\n", expepoch, numepoch, numobs, iod_slip, mp_slip, oslps, mp12, mp21, mp15, mp51, mp17, mp71, fname);
+        if (fOUT) fprintf(fOUT,"%s,%s,%6i,%6i,%6i,%6i,%6i,%6i,%10.6f,%10.6f,%10.6f,%10.6f,%10.6f,%10.6f,%s,%s\n", name, datestr, expepoch, numepoch, numobs, iod_slip, mp_slip, oslps, mp12, mp21, mp15, mp51, mp17, mp71, fname, oslip_str);
         if (fOUT) fclose(fOUT);
     }
     if (fLOG) fclose(fLOG);
