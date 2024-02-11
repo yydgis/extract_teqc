@@ -21,7 +21,7 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{91c8f7a6-a973-41b9-8656-e6aa681cf311}</ProjectGuid>
+    <ProjectGuid>{39C893D9-2267-4152-9752-6F03F92B43E8}</ProjectGuid>
     <RootNamespace>testrtcm</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>

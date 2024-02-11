@@ -289,6 +289,10 @@ int main(int argc, const char* argv[])
         FILE* fOUT_980 = numof980 > 0 ? set_output_file(cur_date.c_str(), "-980.csv") : NULL;
         FILE* fOUT_335 = numof335 > 0 ? set_output_file(cur_date.c_str(), "-MTK.csv") : NULL;
         FILE* fOUT_IGS = numofigs > 0 ? set_output_file(cur_date.c_str(), "-IGS.csv") : NULL;
+        if (fOUT_P40) fprintf(fOUT_P40, "date,epoch exp, epoch obs, availability %, oslips, MP12, MP21, MP15, MP51, MP16, MP61, MP17, MP71, MP18, MP81, S/N, rcv type\n");
+        if (fOUT_980) fprintf(fOUT_980, "date,epoch exp, epoch obs, availability %, oslips, MP12, MP21, MP15, MP51, MP16, MP61, MP17, MP71, MP18, MP81, S/N, rcv type\n");
+        if (fOUT_335) fprintf(fOUT_335, "date,epoch exp, epoch obs, availability %, oslips, MP12, MP21, MP15, MP51, MP16, MP61, MP17, MP71, MP18, MP81, S/N, rcv type\n");
+        if (fOUT_IGS) fprintf(fOUT_IGS, "date,epoch exp, epoch obs, availability %, oslips, MP12, MP21, MP15, MP51, MP16, MP61, MP17, MP71, MP18, MP81, S/N, rcv type\n");
         for (std::vector<rcv_teqc_t>::iterator pStn = pRcv->second.begin(); pStn != pRcv->second.end(); ++pStn)
         {
             if (pStn->type == 0 && fOUT_IGS) fprintf(fOUT_IGS, "%s,%6i,%6i,%6.2f,%6i,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%s,%s\n", pRcv->first.c_str(), pStn->total_exp, pStn->total_obs, pStn->rate * 1.0, pStn->oslips, pStn->mp12, pStn->mp21, pStn->mp15, pStn->mp51, pStn->mp16, pStn->mp61, pStn->mp17, pStn->mp71, pStn->mp18, pStn->mp81, pStn->name.c_str(), pStn->rcv_type.c_str());
