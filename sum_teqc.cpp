@@ -151,8 +151,44 @@ static void sum_teqc(const char* fname)
     return;
 }
 
+struct coord_t
+{
+    std::string country;
+    double lat;
+    double lon;
+};
+
+std::map<std::string, coord_t> mCoords;
+
+static int read_coord_file(const char* fname)
+{
+    FILE* fLOG = fopen(fname, "r");
+    char buffer[255] = { 0 };
+    unsigned long numofline = 0;
+    char* val[MAXFIELD];
+    while (fLOG && !feof(fLOG) && fgets(buffer, sizeof(buffer), fLOG))
+    {
+        ++numofline;
+        if (numofline < 2) continue;
+        int num = parse_fields(buffer, val);
+        if (num < 4) continue;
+        std::string name = std::string(val[0]);
+        double lat = atof(val[1]);
+        double lon = atof(val[2]);
+        if (name.size() > 0 && fabs(lat) > 0.001 && fabs(lon) > 0.001)
+        {
+            mCoords[name].lat = lat;
+            mCoords[name].lon = lon;
+            mCoords[name].country = val[3];
+        }
+    }
+    if (fLOG) fclose(fLOG);
+    return mCoords.size();
+}
+
 int main(int argc, const char* argv[])
 {
+    read_coord_file("all_online.csv");
     for (int i = 1; i < argc; ++i)
         sum_teqc(argv[i]);
     for (std::map<std::string, std::vector<rcv_teqc_t>>::iterator pRcv = mRcv.begin(); pRcv != mRcv.end(); ++pRcv)
@@ -289,16 +325,16 @@ int main(int argc, const char* argv[])
         FILE* fOUT_980 = numof980 > 0 ? set_output_file(cur_date.c_str(), "-980.csv") : NULL;
         FILE* fOUT_335 = numof335 > 0 ? set_output_file(cur_date.c_str(), "-MTK.csv") : NULL;
         FILE* fOUT_IGS = numofigs > 0 ? set_output_file(cur_date.c_str(), "-IGS.csv") : NULL;
-        if (fOUT_P40) fprintf(fOUT_P40, "date,epoch exp, epoch obs, availability %, oslips, MP12, MP21, MP15, MP51, MP16, MP61, MP17, MP71, MP18, MP81, S/N, rcv type\n");
-        if (fOUT_980) fprintf(fOUT_980, "date,epoch exp, epoch obs, availability %, oslips, MP12, MP21, MP15, MP51, MP16, MP61, MP17, MP71, MP18, MP81, S/N, rcv type\n");
-        if (fOUT_335) fprintf(fOUT_335, "date,epoch exp, epoch obs, availability %, oslips, MP12, MP21, MP15, MP51, MP16, MP61, MP17, MP71, MP18, MP81, S/N, rcv type\n");
-        if (fOUT_IGS) fprintf(fOUT_IGS, "date,epoch exp, epoch obs, availability %, oslips, MP12, MP21, MP15, MP51, MP16, MP61, MP17, MP71, MP18, MP81, S/N, rcv type\n");
+        if (fOUT_P40) fprintf(fOUT_P40, "date,latitude,longitude,country,epoch exp, epoch obs, availability, oslips, MP12, MP21, MP15, MP51, MP16, MP61, MP17, MP71, MP18, MP81, SN, rcv type\n");
+        if (fOUT_980) fprintf(fOUT_980, "date,latitude,longitude,country,epoch exp, epoch obs, availability, oslips, MP12, MP21, MP15, MP51, MP16, MP61, MP17, MP71, MP18, MP81, SN, rcv type\n");
+        if (fOUT_335) fprintf(fOUT_335, "date,latitude,longitude,country,epoch exp, epoch obs, availability, oslips, MP12, MP21, MP15, MP51, MP16, MP61, MP17, MP71, MP18, MP81, SN, rcv type\n");
+        if (fOUT_IGS) fprintf(fOUT_IGS, "date,latitude,longitude,country,epoch exp, epoch obs, availability, oslips, MP12, MP21, MP15, MP51, MP16, MP61, MP17, MP71, MP18, MP81, SN, rcv type\n");
         for (std::vector<rcv_teqc_t>::iterator pStn = pRcv->second.begin(); pStn != pRcv->second.end(); ++pStn)
         {
-            if (pStn->type == 0 && fOUT_IGS) fprintf(fOUT_IGS, "%s,%6i,%6i,%6.2f,%6i,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%s,%s\n", pRcv->first.c_str(), pStn->total_exp, pStn->total_obs, pStn->rate * 1.0, pStn->oslips, pStn->mp12, pStn->mp21, pStn->mp15, pStn->mp51, pStn->mp16, pStn->mp61, pStn->mp17, pStn->mp71, pStn->mp18, pStn->mp81, pStn->name.c_str(), pStn->rcv_type.c_str());
-            if (pStn->type == 1 && fOUT_P40) fprintf(fOUT_P40, "%s,%6i,%6i,%6.2f,%6i,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%s,%s\n", pRcv->first.c_str(), pStn->total_exp, pStn->total_obs, pStn->rate * 1.0, pStn->oslips, pStn->mp12, pStn->mp21, pStn->mp15, pStn->mp51, pStn->mp16, pStn->mp61, pStn->mp17, pStn->mp71, pStn->mp18, pStn->mp81, pStn->name.c_str(), pStn->rcv_type.c_str());
-            if (pStn->type == 2 && fOUT_980) fprintf(fOUT_980, "%s,%6i,%6i,%6.2f,%6i,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%s,%s\n", pRcv->first.c_str(), pStn->total_exp, pStn->total_obs, pStn->rate * 1.0, pStn->oslips, pStn->mp12, pStn->mp21, pStn->mp15, pStn->mp51, pStn->mp16, pStn->mp61, pStn->mp17, pStn->mp71, pStn->mp18, pStn->mp81, pStn->name.c_str(), pStn->rcv_type.c_str());
-            if (pStn->type == 3 && fOUT_335) fprintf(fOUT_335, "%s,%6i,%6i,%6.2f,%6i,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%s,%s\n", pRcv->first.c_str(), pStn->total_exp, pStn->total_obs, pStn->rate * 1.0, pStn->oslips, pStn->mp12, pStn->mp21, pStn->mp15, pStn->mp51, pStn->mp16, pStn->mp61, pStn->mp17, pStn->mp71, pStn->mp18, pStn->mp81, pStn->name.c_str(), pStn->rcv_type.c_str());
+            if (pStn->type == 0 && fOUT_IGS) fprintf(fOUT_IGS, "%s,%7.2f,%7.2f,%s,%6i,%6i,%6.2f,%6i,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%s,%s\n", pRcv->first.c_str(), mCoords[pStn->name].lat, mCoords[pStn->name].lon, mCoords[pStn->name].country.c_str(), pStn->total_exp, pStn->total_obs, pStn->rate * 1.0, pStn->oslips, pStn->mp12, pStn->mp21, pStn->mp15, pStn->mp51, pStn->mp16, pStn->mp61, pStn->mp17, pStn->mp71, pStn->mp18, pStn->mp81, pStn->name.c_str(), pStn->rcv_type.c_str());
+            if (pStn->type == 1 && fOUT_P40) fprintf(fOUT_P40, "%s,%7.2f,%7.2f,%s,%6i,%6i,%6.2f,%6i,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%s,%s\n", pRcv->first.c_str(), mCoords[pStn->name].lat, mCoords[pStn->name].lon, mCoords[pStn->name].country.c_str(), pStn->total_exp, pStn->total_obs, pStn->rate * 1.0, pStn->oslips, pStn->mp12, pStn->mp21, pStn->mp15, pStn->mp51, pStn->mp16, pStn->mp61, pStn->mp17, pStn->mp71, pStn->mp18, pStn->mp81, pStn->name.c_str(), pStn->rcv_type.c_str());
+            if (pStn->type == 2 && fOUT_980) fprintf(fOUT_980, "%s,%7.2f,%7.2f,%s,%6i,%6i,%6.2f,%6i,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%s,%s\n", pRcv->first.c_str(), mCoords[pStn->name].lat, mCoords[pStn->name].lon, mCoords[pStn->name].country.c_str(), pStn->total_exp, pStn->total_obs, pStn->rate * 1.0, pStn->oslips, pStn->mp12, pStn->mp21, pStn->mp15, pStn->mp51, pStn->mp16, pStn->mp61, pStn->mp17, pStn->mp71, pStn->mp18, pStn->mp81, pStn->name.c_str(), pStn->rcv_type.c_str());
+            if (pStn->type == 3 && fOUT_335) fprintf(fOUT_335, "%s,%7.2f,%7.2f,%s,%6i,%6i,%6.2f,%6i,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%s,%s\n", pRcv->first.c_str(), mCoords[pStn->name].lat, mCoords[pStn->name].lon, mCoords[pStn->name].country.c_str(), pStn->total_exp, pStn->total_obs, pStn->rate * 1.0, pStn->oslips, pStn->mp12, pStn->mp21, pStn->mp15, pStn->mp51, pStn->mp16, pStn->mp61, pStn->mp17, pStn->mp71, pStn->mp18, pStn->mp81, pStn->name.c_str(), pStn->rcv_type.c_str());
         }
         if (fOUT_P40) fclose(fOUT_P40);
         if (fOUT_980) fclose(fOUT_980);
