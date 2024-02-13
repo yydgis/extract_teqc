@@ -186,9 +186,34 @@ static int read_coord_file(const char* fname)
     return mCoords.size();
 }
 
+std::vector<std::string> stations;
+
+static int read_station_list(const char* fname)
+{
+    FILE* fLOG = fopen(fname, "r");
+    char buffer[255] = { 0 };
+    unsigned long numofline = 0;
+    char* val[MAXFIELD];
+    while (fLOG && !feof(fLOG) && fgets(buffer, sizeof(buffer), fLOG))
+    {
+        ++numofline;
+        if (numofline < 2) continue;
+        int num = parse_fields(buffer, val);
+        if (num < 1) continue;
+        std::string name = std::string(val[0]);
+        name.erase(name.find_last_not_of(" \n\r\t") + 1);
+        if (name.size() > 0 && std::find(stations.begin(), stations.end(), name)==stations.end())
+        {
+            stations.push_back(name);
+        }
+    }
+    if (fLOG) fclose(fLOG);
+    return stations.size();
+}
 int main(int argc, const char* argv[])
 {
     read_coord_file("all_online.csv");
+    read_station_list("stations.csv");
     for (int i = 1; i < argc; ++i)
         sum_teqc(argv[i]);
     for (std::map<std::string, std::vector<rcv_teqc_t>>::iterator pRcv = mRcv.begin(); pRcv != mRcv.end(); ++pRcv)
@@ -320,21 +345,56 @@ int main(int argc, const char* argv[])
                 cur_date[i] = '-';
         }
 
+        FILE *fLIST = stations.size()>0 ? set_output_file(cur_date.c_str(), "-list.csv") : NULL;
+        if (fLIST) fprintf(fLIST, "SN,QC,epoch exp,epoch obs,availability,oslips,MP12,MP21,MP15,MP51,MP16,MP61,MP17,MP71,MP18,MP81,qc_counter,rcv type\n");
+        int numofok = 0;
+        for (std::vector<std::string>::iterator pList = stations.begin(); pList != stations.end(); ++pList)
+        {
+            int isOK = 0;
+            for (std::vector<rcv_teqc_t>::iterator pStn = pRcv->second.begin(); pStn != pRcv->second.end(); ++pStn)
+            {
+                if (pStn->name == *pList)
+                {
+                    int qc_ok = 0;
+                    if (pStn->oslips >= 4000 && pStn->mp12 <= 0.5 && pStn->mp21 <= 0.5 && pStn->mp12 > 0.0 && pStn->mp21 > 0.0 && pStn->total_obs >= (86400 * 0.99)) {
+                        qc_ok = 1; numofok++;
+                    }
+                    if (fLIST) fprintf(fLIST, "%s,%i,%6i,%6i,%6.2f,%6i,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%i,%s,%s\n", pStn->name.c_str(), qc_ok, pStn->total_exp, pStn->total_obs, pStn->rate * 1.0, pStn->oslips, pStn->mp12, pStn->mp21, pStn->mp15, pStn->mp51, pStn->mp16, pStn->mp61, pStn->mp17, pStn->mp71, pStn->mp18, pStn->mp81, numofok, pRcv->first.c_str(), pStn->rcv_type.c_str());
+                    isOK = 1;
+                    break;
+                }
+            }
+            if (!isOK)
+            {
+                if (fLIST) fprintf(fLIST, "%s,,,,,,,,,,,,,,,,,,\n", pList->c_str());
+            }
+        }
+        if (fLIST) fclose(fLIST);
 
         FILE* fOUT_P40 = numofp40 > 0 ? set_output_file(cur_date.c_str(), "-P40.csv") : NULL;
         FILE* fOUT_980 = numof980 > 0 ? set_output_file(cur_date.c_str(), "-980.csv") : NULL;
         FILE* fOUT_335 = numof335 > 0 ? set_output_file(cur_date.c_str(), "-MTK.csv") : NULL;
         FILE* fOUT_IGS = numofigs > 0 ? set_output_file(cur_date.c_str(), "-IGS.csv") : NULL;
-        if (fOUT_P40) fprintf(fOUT_P40, "date,latitude,longitude,country,epoch exp, epoch obs, availability, oslips, MP12, MP21, MP15, MP51, MP16, MP61, MP17, MP71, MP18, MP81, SN, rcv type\n");
-        if (fOUT_980) fprintf(fOUT_980, "date,latitude,longitude,country,epoch exp, epoch obs, availability, oslips, MP12, MP21, MP15, MP51, MP16, MP61, MP17, MP71, MP18, MP81, SN, rcv type\n");
-        if (fOUT_335) fprintf(fOUT_335, "date,latitude,longitude,country,epoch exp, epoch obs, availability, oslips, MP12, MP21, MP15, MP51, MP16, MP61, MP17, MP71, MP18, MP81, SN, rcv type\n");
-        if (fOUT_IGS) fprintf(fOUT_IGS, "date,latitude,longitude,country,epoch exp, epoch obs, availability, oslips, MP12, MP21, MP15, MP51, MP16, MP61, MP17, MP71, MP18, MP81, SN, rcv type\n");
+        if (fOUT_P40) fprintf(fOUT_P40, "SN,QC,latitude,longitude,country,epoch exp,epoch obs,availability,oslips,MP12,MP21,MP15,MP51,MP16,MP61,MP17,MP71,MP18,MP81,QC counter,date,rcv type\n");
+        if (fOUT_980) fprintf(fOUT_980, "SN,QC,latitude,longitude,country,epoch exp,epoch obs,availability,oslips,MP12,MP21,MP15,MP51,MP16,MP61,MP17,MP71,MP18,MP81,QC counter,date,rcv type\n");
+        if (fOUT_335) fprintf(fOUT_335, "SN,QC,latitude,longitude,country,epoch exp,epoch obs,availability,oslips,MP12,MP21,MP15,MP51,MP16,MP61,MP17,MP71,MP18,MP81,QC counter,date,rcv type\n");
+        if (fOUT_IGS) fprintf(fOUT_IGS, "SN,QC,latitude,longitude,country,epoch exp,epoch obs,availability,oslips,MP12,MP21,MP15,MP51,MP16,MP61,MP17,MP71,MP18,MP81,QC counter,date,rcv type\n");
+		int numofp40_ok = 0;
+		int numof980_ok = 0;
+		int numof335_ok = 0;
+		int numofigs_ok = 0;
         for (std::vector<rcv_teqc_t>::iterator pStn = pRcv->second.begin(); pStn != pRcv->second.end(); ++pStn)
         {
-            if (pStn->type == 0 && fOUT_IGS) fprintf(fOUT_IGS, "%s,%7.2f,%7.2f,%s,%6i,%6i,%6.2f,%6i,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%s,%s\n", pRcv->first.c_str(), mCoords[pStn->name].lat, mCoords[pStn->name].lon, mCoords[pStn->name].country.c_str(), pStn->total_exp, pStn->total_obs, pStn->rate * 1.0, pStn->oslips, pStn->mp12, pStn->mp21, pStn->mp15, pStn->mp51, pStn->mp16, pStn->mp61, pStn->mp17, pStn->mp71, pStn->mp18, pStn->mp81, pStn->name.c_str(), pStn->rcv_type.c_str());
-            if (pStn->type == 1 && fOUT_P40) fprintf(fOUT_P40, "%s,%7.2f,%7.2f,%s,%6i,%6i,%6.2f,%6i,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%s,%s\n", pRcv->first.c_str(), mCoords[pStn->name].lat, mCoords[pStn->name].lon, mCoords[pStn->name].country.c_str(), pStn->total_exp, pStn->total_obs, pStn->rate * 1.0, pStn->oslips, pStn->mp12, pStn->mp21, pStn->mp15, pStn->mp51, pStn->mp16, pStn->mp61, pStn->mp17, pStn->mp71, pStn->mp18, pStn->mp81, pStn->name.c_str(), pStn->rcv_type.c_str());
-            if (pStn->type == 2 && fOUT_980) fprintf(fOUT_980, "%s,%7.2f,%7.2f,%s,%6i,%6i,%6.2f,%6i,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%s,%s\n", pRcv->first.c_str(), mCoords[pStn->name].lat, mCoords[pStn->name].lon, mCoords[pStn->name].country.c_str(), pStn->total_exp, pStn->total_obs, pStn->rate * 1.0, pStn->oslips, pStn->mp12, pStn->mp21, pStn->mp15, pStn->mp51, pStn->mp16, pStn->mp61, pStn->mp17, pStn->mp71, pStn->mp18, pStn->mp81, pStn->name.c_str(), pStn->rcv_type.c_str());
-            if (pStn->type == 3 && fOUT_335) fprintf(fOUT_335, "%s,%7.2f,%7.2f,%s,%6i,%6i,%6.2f,%6i,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%s,%s\n", pRcv->first.c_str(), mCoords[pStn->name].lat, mCoords[pStn->name].lon, mCoords[pStn->name].country.c_str(), pStn->total_exp, pStn->total_obs, pStn->rate * 1.0, pStn->oslips, pStn->mp12, pStn->mp21, pStn->mp15, pStn->mp51, pStn->mp16, pStn->mp61, pStn->mp17, pStn->mp71, pStn->mp18, pStn->mp81, pStn->name.c_str(), pStn->rcv_type.c_str());
+			int is_ok = 0;
+			if (pStn->type == 0 && pStn->oslips>=4000 && pStn->mp12 <=0.5 && pStn->mp21<=0.5 && pStn->mp12>0.0 && pStn->mp21 > 0.0 && pStn->total_obs >= (86400*0.99)) { ++numofp40_ok; is_ok = 1; }
+			if (pStn->type == 1 && pStn->oslips>=4000 && pStn->mp12 <=0.5 && pStn->mp21<=0.5 && pStn->mp12>0.0 && pStn->mp21 > 0.0 && pStn->total_obs >= (86400*0.99)) { ++numof980_ok; is_ok = 1; }
+			if (pStn->type == 2 && pStn->oslips>=4000 && pStn->mp15 <=0.5 && pStn->mp51<=0.5 && pStn->mp15>0.0 && pStn->mp51 > 0.0 && pStn->total_obs >= (86400*0.99)) { ++numof335_ok; is_ok = 1; }
+			if (pStn->type == 3 && pStn->oslips>=4000 && pStn->mp12 <=0.5 && pStn->mp21<=0.5 && pStn->mp12>0.0 && pStn->mp21 > 0.0 && pStn->total_obs >= (86400*0.99)) { ++numofigs_ok; is_ok = 1; }
+
+            if (pStn->type == 0 && fOUT_IGS) fprintf(fOUT_IGS, "%s,%i,%7.2f,%7.2f,%s,%6i,%6i,%6.2f,%6i,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%i,%s,%s\n", pStn->name.c_str(), is_ok, mCoords[pStn->name].lat, mCoords[pStn->name].lon, mCoords[pStn->name].country.c_str(), pStn->total_exp, pStn->total_obs, pStn->rate * 1.0, pStn->oslips, pStn->mp12, pStn->mp21, pStn->mp15, pStn->mp51, pStn->mp16, pStn->mp61, pStn->mp17, pStn->mp71, pStn->mp18, pStn->mp81, numofp40_ok, pRcv->first.c_str(), pStn->rcv_type.c_str());
+            if (pStn->type == 1 && fOUT_P40) fprintf(fOUT_P40, "%s,%i,%7.2f,%7.2f,%s,%6i,%6i,%6.2f,%6i,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%i,%s,%s\n", pStn->name.c_str(), is_ok, mCoords[pStn->name].lat, mCoords[pStn->name].lon, mCoords[pStn->name].country.c_str(), pStn->total_exp, pStn->total_obs, pStn->rate * 1.0, pStn->oslips, pStn->mp12, pStn->mp21, pStn->mp15, pStn->mp51, pStn->mp16, pStn->mp61, pStn->mp17, pStn->mp71, pStn->mp18, pStn->mp81, numof980_ok, pRcv->first.c_str(), pStn->rcv_type.c_str());
+            if (pStn->type == 2 && fOUT_980) fprintf(fOUT_980, "%s,%i,%7.2f,%7.2f,%s,%6i,%6i,%6.2f,%6i,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%i,%s,%s\n", pStn->name.c_str(), is_ok, mCoords[pStn->name].lat, mCoords[pStn->name].lon, mCoords[pStn->name].country.c_str(), pStn->total_exp, pStn->total_obs, pStn->rate * 1.0, pStn->oslips, pStn->mp12, pStn->mp21, pStn->mp15, pStn->mp51, pStn->mp16, pStn->mp61, pStn->mp17, pStn->mp71, pStn->mp18, pStn->mp81, numof335_ok, pRcv->first.c_str(), pStn->rcv_type.c_str());
+            if (pStn->type == 3 && fOUT_335) fprintf(fOUT_335, "%s,%i,%7.2f,%7.2f,%s,%6i,%6i,%6.2f,%6i,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%7.3f,%i,%s,%s\n", pStn->name.c_str(), is_ok, mCoords[pStn->name].lat, mCoords[pStn->name].lon, mCoords[pStn->name].country.c_str(), pStn->total_exp, pStn->total_obs, pStn->rate * 1.0, pStn->oslips, pStn->mp12, pStn->mp21, pStn->mp15, pStn->mp51, pStn->mp16, pStn->mp61, pStn->mp17, pStn->mp71, pStn->mp18, pStn->mp81, numofigs_ok, pRcv->first.c_str(), pStn->rcv_type.c_str());
         }
         if (fOUT_P40) fclose(fOUT_P40);
         if (fOUT_980) fclose(fOUT_980);
