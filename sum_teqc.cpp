@@ -5,6 +5,10 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
 
 struct teqc_t
 {
