@@ -192,11 +192,24 @@ static int read_station_list(const char* fname)
 {
     FILE* fLOG = fopen(fname, "r");
     char buffer[255] = { 0 };
+    int data = 0;
+    unsigned long numofread = 0;
     unsigned long numofline = 0;
     char* val[MAXFIELD];
-    while (fLOG && !feof(fLOG) && fgets(buffer, sizeof(buffer), fLOG))
+    while (fLOG && !feof(fLOG) && (data = fgetc(fLOG)) != EOF)
     {
-        ++numofline;
+        if (!numofread)
+            memset(buffer, 0, sizeof(buffer));
+        if (data == '\r' || data == '\n')
+        {
+            ++numofline;
+            numofread = 0;
+        }
+        else
+        {
+            buffer[numofread++] = data;
+            continue;
+        }
         if (numofline < 2) continue;
         int num = parse_fields(buffer, val);
         if (num < 1) continue;
