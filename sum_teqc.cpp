@@ -67,6 +67,7 @@ static int parse_fields(char* const buffer, char** val)
         }
         else break;
     }
+    if (p) val[n++] = p;
     return n;
 }
 
