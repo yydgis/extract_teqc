@@ -191,6 +191,122 @@ static int read_coord_file(const char* fname)
     return mCoords.size();
 }
 
+struct relay_t
+{
+    int strType;
+    std::string status;
+    std::string reason;
+    std::string host;
+    int port;
+    std::string username;
+    std::string password;
+    std::string mountpoint;
+    int isUsed;
+    int isEph;
+    double xyz_spp[3];
+    double xyz_ppp[3];
+    std::string coordSystemName;
+    double xyz_offset[3];
+//    name, svrType(0: ALL; 1: L1l5), status, reason, host, port, username, password, mountpoint, isUsed(1: RTK Service), eph(1: Send eph data), SPP, PPP displacement detection, PPP, coordinate system name, offset
+//       D8BC387F85F1, 0, ACTIVE, , 52.8.236.207, 2201, admin, admin, D8BC387F85F1, 1, 0, x: 1363855.824; y: -4651430.175; z: 4131511.714, 1, x : 1363856.432; y: -4651431.709; z: 4131511.104, NAD83(2011) (2010.0), x : 0; y : 0; z: 0
+};
+
+std::map<std::string, relay_t> mRelays;
+
+static int read_relay_file(const char* fname)
+{
+    FILE* fLOG = fopen(fname, "r");
+    char buffer[255] = { 0 };
+    unsigned long numofline = 0;
+    char* val[MAXFIELD];
+    while (fLOG && !feof(fLOG) && fgets(buffer, sizeof(buffer), fLOG))
+    {
+        ++numofline;
+        if (numofline < 2) continue;
+        int num = parse_fields(buffer, val);
+        if (num <16) continue;
+        std::string name = std::string(val[0]);
+        int svrType = atoi(val[1]);
+        std::string status = std::string(val[2]);
+        std::string reason = std::string(val[3]);
+        std::string mount = std::string(val[8]);
+        std::string xyz_ppp_str = std::string(val[13]);
+        std::string coordSystemName = std::string(val[14]);
+        std::string xyz_off_str = std::string(val[15]);
+        strcpy(buffer, xyz_ppp_str.c_str());
+        char *found = strstr(buffer, "x:");
+        if (found)
+        {
+            found[0] = ' ';
+            found[1] = ' ';
+        }
+        found = strstr(buffer, "y:");
+        if (found)
+        {
+            found[0] = ' ';
+            found[1] = ',';
+        }
+        found = strstr(buffer, "z:");
+        if (found)
+        {
+            found[0] = ' ';
+            found[1] = ',';
+        }
+        num = parse_fields(buffer, val);
+        double xyz_ppp[3] = { 0 };
+        if (num > 2)
+        {
+            xyz_ppp[0] = atof(val[0]);
+            xyz_ppp[1] = atof(val[1]);
+            xyz_ppp[2] = atof(val[2]);
+        }
+        strcpy(buffer, xyz_off_str.c_str());
+        found = strstr(buffer, "x:");
+        if (found)
+        {
+            found[0] = ' ';
+            found[1] = ' ';
+        }
+        found = strstr(buffer, "y:");
+        if (found)
+        {
+            found[0] = ' ';
+            found[1] = ',';
+        }
+        found = strstr(buffer, "z:");
+        if (found)
+        {
+            found[0] = ' ';
+            found[1] = ',';
+        }
+        num = parse_fields(buffer, val);
+        double xyz_off[3] = { 0 };
+        if (num > 2)
+        {
+            xyz_off[0] = atof(val[0]);
+            xyz_off[1] = atof(val[1]);
+            xyz_off[2] = atof(val[2]);
+        }
+        if (name.size() > 0)
+        {
+            mRelays[name].mountpoint = mount;
+            mRelays[name].coordSystemName = coordSystemName;
+            mRelays[name].xyz_offset[0] = xyz_off[0];
+            mRelays[name].xyz_offset[1] = xyz_off[1];
+            mRelays[name].xyz_offset[2] = xyz_off[2];
+            mRelays[name].xyz_ppp[0] = xyz_ppp[0];
+            mRelays[name].xyz_ppp[1] = xyz_ppp[1];
+            mRelays[name].xyz_ppp[2] = xyz_ppp[2];
+            if (name != mount)
+            {
+                printf("%s,%s mountpoint does not match\n", name.c_str(), mount.c_str());
+            }
+        }
+    }
+    if (fLOG) fclose(fLOG);
+    return mRelays.size();
+}
+
 std::vector<std::string> stations;
 
 static int read_station_list(const char* fname)
@@ -228,10 +344,50 @@ static int read_station_list(const char* fname)
     if (fLOG) fclose(fLOG);
     return stations.size();
 }
+static int check_na_coordinate_system()
+{
+    int num = 0;
+    FILE* fBAD = fopen("nomatch.csv", "w");
+    FILE* fNA = fopen("na.csv", "w");
+    FILE* fOT = fopen("others.csv", "w");
+    for (std::map<std::string, relay_t>::iterator pRelay = mRelays.begin(); pRelay != mRelays.end(); ++pRelay)
+    {
+        std::map<std::string, coord_t>::iterator pCoord = mCoords.find(pRelay->first);
+        if (pCoord == mCoords.end())
+        {
+            if (fBAD) fprintf(fBAD,"%s,%s,%14.4f,%14.4f,%14.4f,%10.4f,%10.4f,%10.4f cannot find a match\n", pRelay->first.c_str(), pRelay->second.coordSystemName.c_str(), pRelay->second.xyz_ppp[0], pRelay->second.xyz_ppp[1], pRelay->second.xyz_ppp[2], pRelay->second.xyz_offset[0], pRelay->second.xyz_offset[1], pRelay->second.xyz_offset[2]);
+        }
+        else
+        {
+            if (pCoord->second.country.find("USA") != std::string::npos || pCoord->second.country.find("CAN") != std::string::npos)
+            {
+                if (pRelay->second.coordSystemName.find("NAD") == std::string::npos)
+                {
+                    printf("%s,%s,%14.4f,%14.4f,%14.4f,%10.4f,%10.4f,%10.4f,%s\n", pRelay->first.c_str(), pRelay->second.coordSystemName.c_str(), pRelay->second.xyz_ppp[0], pRelay->second.xyz_ppp[1], pRelay->second.xyz_ppp[2], pRelay->second.xyz_offset[0], pRelay->second.xyz_offset[1], pRelay->second.xyz_offset[2], pCoord->second.country.c_str());
+                }
+                if (fNA) fprintf(fNA, "%s,%s,%14.4f,%14.4f,%14.4f,%10.4f,%10.4f,%10.4f,%s\n", pRelay->first.c_str(), pRelay->second.coordSystemName.c_str(), pRelay->second.xyz_ppp[0], pRelay->second.xyz_ppp[1], pRelay->second.xyz_ppp[2], pRelay->second.xyz_offset[0], pRelay->second.xyz_offset[1], pRelay->second.xyz_offset[2], pCoord->second.country.c_str());
+            }
+            else
+            {
+                if (pRelay->second.coordSystemName.find("NAD") != std::string::npos)
+                {
+                    printf("%s,%s,%14.4f,%14.4f,%14.4f,%10.4f,%10.4f,%10.4f,%s\n", pRelay->first.c_str(), pRelay->second.coordSystemName.c_str(), pRelay->second.xyz_ppp[0], pRelay->second.xyz_ppp[1], pRelay->second.xyz_ppp[2], pRelay->second.xyz_offset[0], pRelay->second.xyz_offset[1], pRelay->second.xyz_offset[2], pCoord->second.country.c_str());
+                }
+                if (fOT) fprintf(fOT, "%s,%s,%14.4f,%14.4f,%14.4f,%10.4f,%10.4f,%10.4f,%s\n", pRelay->first.c_str(), pRelay->second.coordSystemName.c_str(), pRelay->second.xyz_ppp[0], pRelay->second.xyz_ppp[1], pRelay->second.xyz_ppp[2], pRelay->second.xyz_offset[0], pRelay->second.xyz_offset[1], pRelay->second.xyz_offset[2], pCoord->second.country.c_str());
+            }
+        }
+    }
+    if (fBAD) fclose(fBAD);
+    if (fNA) fclose(fNA);
+    if (fOT) fclose(fOT);
+    return 0;
+}
 int main(int argc, const char* argv[])
 {
+    read_relay_file("relay.csv");
     read_coord_file("all_online.csv");
     read_station_list("stations.csv");
+    check_na_coordinate_system();
     for (int i = 1; i < argc; ++i)
         sum_teqc(argv[i]);
     for (std::map<std::string, std::vector<rcv_teqc_t>>::iterator pRcv = mRcv.begin(); pRcv != mRcv.end(); ++pRcv)
