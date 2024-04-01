@@ -37,7 +37,7 @@ struct rcv_teqc_t
     int total_exp;
     int total_obs;
     int oslips;
-    int rate;
+    double rate;
     double mp12;
     double mp21;
     double mp15;
@@ -445,7 +445,7 @@ int main(int argc, const char* argv[])
                 mp18 /= n;
                 mp81 /= n;
             }
-            pStn->rate = (int)(total_exp > 0 ? total_obs * 100.0 / total_exp : 0);
+            pStn->rate = (total_exp > 0 ? total_obs * 100.0 / total_exp : 0);
             pStn->total_exp = total_exp;
             pStn->total_obs = total_obs;
             pStn->oslips = oslips;
